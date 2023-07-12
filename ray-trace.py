@@ -3,7 +3,6 @@ import math
 import sys
 from PIL import Image
 
-
 # READ AND LOAD FROM FILE
 def parse_camera_data(lines):
     camera_data = {}
@@ -80,7 +79,7 @@ def parse_object_data(lines):
         obj = {}
         line = lines[i].split()
         obj['pigment_ref'] = int(line[0])
-        obj['finish_ref'] = int(line[1])
+        obj['surface_ref'] = int(line[1])
         obj_type = line[2]
         if obj_type == 'sphere':
             obj['center'] = [float(x) for x in line[3:6]]
@@ -115,36 +114,52 @@ def parse_file(file_path):
         'objects': object_data
     }
 
-
 #CLASSES 
+
 class Sphere:
-    def __init__(self, center, radius, color):
+    def __init__(self, center, radius, pigment_id, surface_id, color):
         self.center = np.array(center)
         self.radius = radius
         self.color = np.array(color)
+        self.pigment_id = pigment_id
+        self.surface_id = surface_id
 
-    def ray_intersection(self, ray_origin, ray_direction):
-        oc = ray_origin - self.center
-        a = np.dot(ray_direction, ray_direction)
-        b = 2 * np.dot(oc, ray_direction)
-        c = np.dot(oc, oc) - self.radius ** 2
+        def ray_intersection(self, ray_origin, ray_direction):
+            oc = ray_origin - self.center
+            a = np.dot(ray_direction, ray_direction)
+            b = 2 * np.dot(oc, ray_direction)
+            c = np.dot(oc, oc) - self.radius ** 2
 
-        discriminant = b ** 2 - 4 * a * c
+            discriminant = b ** 2 - 4 * a * c
 
-        if discriminant < 0:
-            return np.inf
+            if discriminant < 0:
+                return np.inf
 
-        t1 = (-b + np.sqrt(discriminant)) / (2 * a)
-        t2 = (-b - np.sqrt(discriminant)) / (2 * a)
+            t1 = (-b + np.sqrt(discriminant)) / (2 * a)
+            t2 = (-b - np.sqrt(discriminant)) / (2 * a)
 
-        if t1 >= 0 and t2 >= 0:
-            return min(t1, t2)
-        elif t1 >= 0:
-            return t1
-        elif t2 >= 0:
-            return t2
-        else:
-            return np.inf
+            if t1 >= 0 and t2 >= 0:
+                return min(t1, t2)
+            elif t1 >= 0:
+                return t1
+            elif t2 >= 0:
+                return t2
+            else:
+                return np.inf
+
+    def get_pigment_color(self, hit_point, textures):
+        if self.pigment_id == 2:
+            return self.color
+        
+        # TODO: this should be checker
+        if self.pigment_id == 1:
+            return self.color
+        
+        if self.pigment_id == 0:
+            texture = textures[self.pigment_id]
+            u = np.arctan2(hit_point[2], hit_point[0]) / (2 * np.pi) + 0.5
+            v = np.arccos(hit_point[1] / self.radius) / np.pi
+            return texture.get_color(u, v)
 
 
 class Camera:
@@ -180,11 +195,21 @@ class Light:
         # coeficiente constante de atenuação, atenuação proporcional à distância da fonte da luz e coeficiente de 
         # e coeficiente de atenuação proporcional ao quadrado da distância da fonte da luz
         self.attenuation = np.array(attenuation) 
-        
 
+        
+class Texture:
+    def __init__(self, image_path):
+        self.image = Image.open(image_path).convert("RGB")
+        self.width = self.image.width
+        self.height = self.image.height
+
+    def get_color(self, u, v):
+        x = int(u * self.width) % self.width
+        y = int(v * self.height) % self.height
+        return self.image.getpixel((x, y))
 
 #RAY TRACER
-def trace_ray(ray_origin, ray_direction, objects, lights):
+def trace_ray(ray_origin, ray_direction, objects, lights, textures):
     closest_t = np.inf
     closest_object = None
 
@@ -201,7 +226,7 @@ def trace_ray(ray_origin, ray_direction, objects, lights):
     normal = (hit_point - closest_object.center) / closest_object.radius
 
     # Ambient color
-    ambient_color = closest_object.color * 0.1
+    ambient_color = closest_object.get_pigment_color(hit_point) * 0.1
 
     # Diffuse color
     diffuse_color = np.array([0, 0, 0])
@@ -221,7 +246,8 @@ def trace_ray(ray_origin, ray_direction, objects, lights):
 
         if shadow_t == np.inf:
             diffuse_intensity = np.maximum(np.dot(normal, light_direction), 0)
-            diffuse_effect = closest_object.color * light.color
+            
+            diffuse_effect = closest_object.get_pigment_color(hit_point, textures) * light.color
             diffuse_effect[0] *= diffuse_intensity
             diffuse_effect[1] *= diffuse_intensity
             diffuse_effect[2] *= diffuse_intensity
@@ -231,53 +257,78 @@ def trace_ray(ray_origin, ray_direction, objects, lights):
     color = ambient_color + diffuse_color
     return np.minimum(color, 255)
 
-
-
 def main():
-# Scene configuration
-if len(sys.argv) == 3:
-    width = sys.argv[1]
-    height = sys.argv[2]
-else:
+
+    # Scene configuration
     width = 800
     height = 600
 
-# LOAD FROM FILE
-data = parse_file('scene.txt')
-# print(data['camera'])
-# print(data['lights'])
-# print(data['pigments'])
-# print(data['finishes'])
-# print(data['objects'])
+#     if (len(sys.argv)) == 3:
+#         width = int(sys.argv[1])
+#         height = int(sys.argv[2])
 
-# Create spheres
-sphere1 = Sphere(center=[0, 0, 0], radius=1, color=[255, 0, 0])
-sphere2 = Sphere(center=[-1.5, 0, 2], radius=0.5, color=[0, 255, 0])
-sphere3 = Sphere(center=[1.5, 0, 2], radius=0.5, color=[0, 0, 255])
-objects = [sphere1, sphere2, sphere3]
+    # LOAD FROM FILE
+    data = parse_file('scene.txt')
+
+    # Get Pigments
+    textures = []
+    solid_color = []
+    for pigment in data['pigments']:
+
+        if pigment.get('type') == 'solid':
+            solid_color = pigment['color']
+
+        elif pigment.get('type') == 'texmap':
+            t = Texture(pigment['texture_file'])
+            # TODO: texcoords
+            textures.append(t)
+
+        # TODO: checker
+        #else:
+            
+
+    # Create objects
+    objects = []
+    for obj in data['objects']:
+
+        # shpere
+        if obj['type'] == 'sphere':
+            if (obj['pigment_ref'] == 2): # solid
+                color = solid_color
+            # TODO
+            else: color = solid_color
+            
+            s = Sphere(center=obj['center'], radius=obj['radius'], color=color, pigment_id=obj['pigment_ref'], surface_id=obj['surface_ref'])
+            objects.append(s)
+
+        # TODO: “polyhedron”
+        #else:
+        
 
 
-# Create lights
-lights = []
-for i in range(len(data['lights'])):
-    light = Light(position=data['lights'][i]['position'], color=data['lights'][i]['color'], attenuation=data['lights'][i]['attenuation'])
-    lights.append(light)
-    
+    # Create lights
+    lights = []
+    for i in range(len(data['lights'])):
+        light = Light(position=data['lights'][i]['position'], color=data['lights'][i]['color'], attenuation=data['lights'][i]['attenuation'])
+        lights.append(light)
 
-# Create camera
-camera = Camera( position=data['camera']['position'], target=data['camera']['target'], orientation=data['camera']['normal'], aperture=math.radians(data['camera']['aperture']))
 
-# Create image
-image = np.zeros((height, width, 3), dtype=np.uint8)
+    # Create camera
+    camera = Camera( position=data['camera']['position'], target=data['camera']['target'], orientation=data['camera']['normal'], aperture=math.radians(data['camera']['aperture']))
 
-for y in range(height):
-    for x in range(width):
-        ray_direction = camera.generate_ray_direction(x, y, width, height)
+    # Create image
+    image = np.zeros((height, width, 3), dtype=np.uint8)
 
-        color = trace_ray(camera.position, ray_direction, objects, lights)
+    for y in range(height):
+        for x in range(width):
+            ray_direction = camera.generate_ray_direction(x, y, width, height)
 
-        image[y, x] = color
+            color = trace_ray(camera.position, ray_direction, objects, lights, textures)
 
-image = Image.fromarray(image)
-image.save("output.png")
-image.show()
+            image[y, x] = color
+
+    image = Image.fromarray(image)
+    image.save("output.png")
+    image.show()
+
+main()
