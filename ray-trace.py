@@ -3,7 +3,9 @@ import math
 import sys
 from PIL import Image
 
+
 # READ AND LOAD FROM FILE
+
 def parse_camera_data(lines):
     camera_data = {}
     camera_data['position'] = [float(x) for x in lines[0].split()]
@@ -114,6 +116,7 @@ def parse_file(file_path):
         'objects': object_data
     }
 
+
 #CLASSES 
 
 class Sphere:
@@ -124,28 +127,28 @@ class Sphere:
         self.pigment_id = pigment_id
         self.surface_id = surface_id
 
-        def ray_intersection(self, ray_origin, ray_direction):
-            oc = ray_origin - self.center
-            a = np.dot(ray_direction, ray_direction)
-            b = 2 * np.dot(oc, ray_direction)
-            c = np.dot(oc, oc) - self.radius ** 2
+    def ray_intersection(self, ray_origin, ray_direction):
+        oc = ray_origin - self.center
+        a = np.dot(ray_direction, ray_direction)
+        b = 2 * np.dot(oc, ray_direction)
+        c = np.dot(oc, oc) - self.radius ** 2
 
-            discriminant = b ** 2 - 4 * a * c
+        discriminant = b ** 2 - 4 * a * c
 
-            if discriminant < 0:
-                return np.inf
+        if discriminant < 0:
+            return np.inf
 
-            t1 = (-b + np.sqrt(discriminant)) / (2 * a)
-            t2 = (-b - np.sqrt(discriminant)) / (2 * a)
+        t1 = (-b + np.sqrt(discriminant)) / (2 * a)
+        t2 = (-b - np.sqrt(discriminant)) / (2 * a)
 
-            if t1 >= 0 and t2 >= 0:
-                return min(t1, t2)
-            elif t1 >= 0:
-                return t1
-            elif t2 >= 0:
-                return t2
-            else:
-                return np.inf
+        if t1 >= 0 and t2 >= 0:
+            return min(t1, t2)
+        elif t1 >= 0:
+            return t1
+        elif t2 >= 0:
+            return t2
+        else:
+            return np.inf
 
     def get_pigment_color(self, hit_point, textures):
         if self.pigment_id == 2:
@@ -208,6 +211,8 @@ class Texture:
         y = int(v * self.height) % self.height
         return self.image.getpixel((x, y))
 
+
+
 #RAY TRACER
 def trace_ray(ray_origin, ray_direction, objects, lights, textures):
     closest_t = np.inf
@@ -226,7 +231,7 @@ def trace_ray(ray_origin, ray_direction, objects, lights, textures):
     normal = (hit_point - closest_object.center) / closest_object.radius
 
     # Ambient color
-    ambient_color = closest_object.get_pigment_color(hit_point) * 0.1
+    ambient_color = closest_object.get_pigment_color(hit_point, textures) * 0.1
 
     # Diffuse color
     diffuse_color = np.array([0, 0, 0])
@@ -251,11 +256,16 @@ def trace_ray(ray_origin, ray_direction, objects, lights, textures):
             diffuse_effect[0] *= diffuse_intensity
             diffuse_effect[1] *= diffuse_intensity
             diffuse_effect[2] *= diffuse_intensity
+
+    
+            array = [int(diffuse_effect[0]) , int(diffuse_effect[1]), int(diffuse_effect[2])  ]
             
-            diffuse_color += diffuse_effect
+            diffuse_color += array
 
     color = ambient_color + diffuse_color
     return np.minimum(color, 255)
+
+
 
 def main():
 
@@ -331,4 +341,36 @@ def main():
     image.save("output.png")
     image.show()
 
+
+def create_rainbow_ppm(width, height):
+    image = [['0 0 0' for _ in range(width)] for _ in range(height)]
+
+    # Rainbow colors
+    colors = [
+        (255, 0, 0),    # Red
+        (255, 165, 0),  # Orange
+        (255, 255, 0),  # Yellow
+        (0, 255, 0),    # Green
+        (0, 0, 255),    # Blue
+        (75, 0, 130),   # Indigo
+        (238, 130, 238) # Violet
+    ]
+
+    # Assign colors to each pixel horizontally
+    color_width = width // len(colors)
+    for i, (r, g, b) in enumerate(colors):
+        for x in range(i * color_width, (i + 1) * color_width):
+            for y in range(height):
+                image[y][x] = f'{r} {g} {b}'
+
+    # Write the image data to a PPM file
+    with open('rainbow1.ppm', 'w') as file:
+        file.write(f'P3\n{width} {height}\n255\n')
+        for row in image:
+            file.write(' '.join(row) + '\n')
+
+
+
+# Create the rainbow PPM file
+create_rainbow_ppm(700, 200)
 main()
