@@ -34,40 +34,11 @@ int main(void)
 
 	Image image(width, height);
 
-
-	//int p;
-	//p = 150;
-	//for (int j = 0; j < 100; j++)
-	//{
-	//	for (int i=0; i<300; i++)
-	//	{ 
-	//		image.setPixel(255, 113, 232, i, j);
-	//	}
-	//}
-	//
-	//p = 0;
-	//for (int j = 100; j < 200; j++)
-	//{
-	//	for (int i = 0; i < 300; i++)
-	//	{
-	//		image.setPixel(253, 255, 43, i, j);
-	//	}
-	//}
-	//
-	//p = 255;
-	//for (int j = 200; j < 300; j++)
-	//{
-	//	for (int i = 0; i < 300; i++)
-	//	{
-	//		image.setPixel(47, 249, 255, i, j);
-	//	}
-	//}
-
-	Camera camera(glm::vec3(-5.0f, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(), 25.0f * PI / 180.0f, (float)width / (float)height);
+	Camera camera(glm::vec3(-5.0f, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.f, 1.f, 0.f), 25.0f * PI / 180.0f, (float)width / (float)height);
 
 	ShapeSet scene;
 
-	Plane floor(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(), Color(0.5f, 1.0f, 0.5f));
+	Plane floor(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.f, 1.f, 0.f), Color(0.5f, 1.0f, 0.5f));
 	scene.addShape(&floor);
 
 	Sphere sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, Color(0.5f, 0.5f, 1.0f));
